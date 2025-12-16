@@ -69,7 +69,7 @@ const whitelist = [
   'http://localhost:3000',
   'http://localhost:5173', // Add this for Vite's default dev server
   process.env.FRONTEND_URL,
-  'https://yashagencydev.netlify.app/'
+  'https://yashagencydev.netlify.app'
 
 ];
 
@@ -442,6 +442,7 @@ const adminAuth = (req, res, next) => {
     req.user.email.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase();
 
   if (!isAdmin && !isAdminByEmail) {
+    console.warn(`[Admin Auth] Access denied for user: ${req.user.email} (Role: ${req.user.role})`);
     return res.status(403).json({
       error: 'Admin access required'
     });
