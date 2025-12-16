@@ -68,10 +68,9 @@ app.use(helmet({
 const whitelist = [
   'http://localhost:3000',
   'http://localhost:5173', // Add this for Vite's default dev server
-  'https://samriddhishop.netlify.app',
   process.env.FRONTEND_URL,
-  'https://samriddhishop.in',
-  'https://samriddhishopproduction.netlify.app',
+  'https://yashagencydev.netlify.app/'
+
 ];
 
 const corsOptions = {
@@ -98,7 +97,7 @@ const authLimiter = rateLimit({
 app.use(express.json({ limit: '10mb' }));
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/samriddhishop', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/yashdb', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
