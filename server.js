@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import Razorpay from 'razorpay';
+// import Razorpay from 'razorpay';
 import { z } from 'zod';
 import webpush from 'web-push';
 import nodemailer from 'nodemailer';
@@ -25,7 +25,7 @@ if (!process.env.JWT_SECRET) {
 import OTP from './models/otp.js'; 
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 // Trust the first proxy in front of the app (e.g., on Render, Heroku)
 // This is required for express-rate-limit to work correctly.
@@ -37,7 +37,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://checkout.razorpay.com", "https://connect.facebook.net"],
+      scriptSrc: ["'self'", "https://connect.facebook.net"],
       styleSrc: ["'self'", "'unsafe-inline'"], // 'unsafe-inline' is often needed for CSS-in-JS
       imgSrc: ["'self'", "data:", "https:", "https://storage.googleapis.com"],
       connectSrc: [
@@ -45,12 +45,11 @@ app.use(helmet({
         process.env.FRONTEND_URL,
         "https://samriddhishop.in",
         "https://samriddhishop-backend.onrender.com",
-        "https://lumberjack-cx.razorpay.com",
         "https://www.facebook.com"
       ],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      frameSrc: ["'self'", "https://api.razorpay.com"], // Allow Razorpay's iframe
+      frameSrc: ["'self'"], // Allow Razorpay's iframe
       frameAncestors: ["'self'"], // Mitigates clickjacking
       requireTrustedTypesFor: ["'script'"], // Mitigate DOM-based XSS with Trusted Types
       upgradeInsecureRequests: [],
@@ -105,10 +104,10 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/samriddhi
 });
 
 // Razorpay instance
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// const razorpay = new Razorpay({
+//   key_id: process.env.RAZORPAY_KEY_ID,
+//   key_secret: process.env.RAZORPAY_KEY_SECRET,
+// });
 
 // VAPID keys for web-push
 webpush.setVapidDetails(
@@ -258,7 +257,7 @@ const orderSchema = new mongoose.Schema({
     zipCode: String,
     country: String
   },
-  paymentMethod: { type: String, default: 'cod', enum: ['cod', 'razorpay'] },
+  paymentMethod: { type: String, default: 'cod', enum: ['cod'] },
   paymentStatus: { type: String, enum: ['pending', 'received'], default: 'pending' },
   courierDetails: {
     courierName: String,
@@ -272,11 +271,11 @@ const orderSchema = new mongoose.Schema({
     updatedBy: String,
     notes: String
   }],
-  paymentDetails: {
-    razorpay_payment_id: String,
-    razorpay_order_id: String,
-    razorpay_signature: String,
-  },
+  // paymentDetails: {
+  //   razorpay_payment_id: String,
+  //   razorpay_order_id: String,
+  //   razorpay_signature: String,
+  // },
   couponCode: String,
   discount: { type: Number, default: 0 },
   shippingCost: { type: Number, default: 0 },
@@ -1111,11 +1110,11 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
         discount: req.body.discount || 0,
         shippingCost: req.body.shippingCost || 0,
         tax: req.body.tax || 0,
-        paymentDetails: {
-          razorpay_payment_id: req.body.razorpay_payment_id,
-          razorpay_order_id: req.body.razorpay_order_id,
-          razorpay_signature: req.body.razorpay_signature,
-        }
+        // paymentDetails: {
+        //   razorpay_payment_id: req.body.razorpay_payment_id,
+        //   razorpay_order_id: req.body.razorpay_order_id,
+        //   razorpay_signature: req.body.razorpay_signature,
+        // }
       });
 
       await order.save();
@@ -1337,6 +1336,7 @@ app.post('/api/reset-password/:token', async (req, res) => {
 });
 
 // Create Razorpay Order
+/*
 app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body;
@@ -1382,6 +1382,7 @@ app.post('/api/payment/verify', async (req, res) => {
     res.status(500).json({ error: 'Payment verification failed' });
   }
 });
+*/
 
 app.post('/api/create-admin', async (req, res) => {
   // This endpoint is intentionally left less secure for initial setup.
@@ -1409,7 +1410,7 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
       }
 
       // Allow admin or order owner to update status
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@samriddhishop.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'yashagency25@gmail.com';
       if (req.user.email !== adminEmail && order.userId.toString() !== req.user._id.toString()) {
         return res.status(403).json({ error: 'Access denied' });
       }
@@ -2510,7 +2511,7 @@ app.patch('/api/admin/contacts/:id/status', authenticateToken, adminAuth, async 
 // Create admin account (bypasses rate limiting)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const adminEmail = ['admin@samriddhishop.com', 'support@samriddhishop.in'];
+    const adminEmail = ['yashagency25@gmail.com'];
     const { password } = req.body;
     
     if (!password || password.length < 6) {
