@@ -110,11 +110,15 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/samriddhi
 // });
 
 // VAPID keys for web-push
-webpush.setVapidDetails(
-  'mailto:support@samriddhishop.com',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:yashagency25@gmail.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+} else {
+  console.warn('VAPID keys are missing. Web push notifications will be disabled.');
+}
 
 // --- Centralized Nodemailer Transporter ---
 // Create a single, reusable transporter instance.
@@ -1482,7 +1486,7 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
 
         // Send push notification
         const user = await User.findById(order.userId);
-        if (user && user.pushSubscriptions.length > 0) {
+        if (user && user.pushSubscriptions.length > 0 && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
           const payload = JSON.stringify({
             title: 'Order Status Update',
             body: notificationMessage,
