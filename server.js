@@ -43,8 +43,8 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         process.env.FRONTEND_URL,
-        "https://samriddhishop.in",
-        "https://samriddhishop-backend.onrender.com",
+        "https://Yash Agency.in",
+        "https://Yash Agency-backend.onrender.com",
         "https://www.facebook.com"
       ],
       fontSrc: ["'self'"],
@@ -177,7 +177,14 @@ const userSchema = new mongoose.Schema({
 
   isEmailVerified: { type: Boolean, default: false },
 
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'customer', 'salesman', 'admin'], default: 'customer' },
+
+  // Salesman specific fields
+  isActive: { type: Boolean, default: true },
+  maxDiscountPercent: { type: Number },
+  createdByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  salesmanAddress: { type: String },
+  salesmanPincode: { type: String },
 
   // 🔥 Added for secure session management
   sessionVersion: { type: Number, default: 0 }
@@ -197,6 +204,7 @@ const productSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   description: { type: String, required: true },
   price: { type: Number, required: true, min: 0 },
+  minSellPrice: { type: Number, default: 0 }, // Added for price protection
   originalPrice: { type: Number },
   discountPercentage: { type: Number, default: 0, min: 0, max: 100 },
   imageUrl: { type: String, required: true },
@@ -284,7 +292,13 @@ const orderSchema = new mongoose.Schema({
   shippingCost: { type: Number, default: 0 },
   tax: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
-  refundDetailsSubmitted: { type: Boolean, default: false } // New field
+  refundDetailsSubmitted: { type: Boolean, default: false }, // New field
+
+  // Salesman fields
+  orderSource: { type: String, default: 'website', enum: ['website', 'salesman'] },
+  orderBy: { type: String, default: 'self', enum: ['self', 'salesman'] },
+  salesmanId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  salesmanName: String
 });
 
 // Counter Schema for order numbers
@@ -452,6 +466,21 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
+// Salesman middleware
+const salesmanAuth = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  
+  // Allow admin or salesman
+  if (req.user.role === 'salesman' || req.user.role === 'admin') {
+    if (req.user.role === 'salesman' && req.user.isActive === false) {
+      return res.status(403).json({ error: 'Account disabled. Contact admin.' });
+    }
+    next();
+  } else {
+    return res.status(403).json({ error: 'Salesman access required' });
+  }
+};
+
 const sendOrderStatusEmail = async (userEmail, userName, order) => {
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.error('Email service is not configured. Skipping order status email.');
@@ -466,7 +495,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
   switch (status) {
     case 'pending':
       const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
-      subject = `✅ Order Confirmed: Your SamriddhiShop Order #${orderIdentifier} has been placed!`;
+      subject = `✅ Order Confirmed: Your Yash Agency Order #${orderIdentifier} has been placed!`;
       const orderItemsHtml = order.items.map(item => `
         <tr>
           <td style="padding:10px; border-top:1px solid #ddd;">${item.name}</td>
@@ -500,12 +529,12 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#4CAF50; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">Track My Order</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@samriddhishop.com" style="color:#4CAF50; text-decoration:none;">support@samriddhishop.in</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
               </td>
             </tr>
             <tr>
               <td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">
-                © ${new Date().getFullYear()} SamriddhiShop. All rights reserved.
+                © ${new Date().getFullYear()} Yash Agency. All rights reserved.
               </td>
             </tr>
           </table>
@@ -513,7 +542,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
       break;
     case 'shipped':
       const shippedOrderIdentifier = order.orderNumber || order._id.toString().slice(-8);
-      subject = `🚚 Your SamriddhiShop Order #${shippedOrderIdentifier} has been shipped!`;
+      subject = `🚚 Your Yash Agency Order #${shippedOrderIdentifier} has been shipped!`;
       htmlBody = `
         <body style="margin:0; padding:0; background-color:#f7f7f7; font-family: Arial, sans-serif;">
           <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color:#ffffff; border-radius:8px; overflow:hidden; margin-top:40px; border: 1px solid #ddd;">
@@ -525,7 +554,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
             <tr>
               <td style="padding:30px;">
                 <p style="font-size:18px; color:#333;">Hi ${userName},</p>
-                <p style="font-size:16px; color:#555;">Great news! Your SamriddhiShop order #${shippedOrderIdentifier} has been shipped and is on its way to you.</p>
+                <p style="font-size:16px; color:#555;">Great news! Your Yash Agency order #${shippedOrderIdentifier} has been shipped and is on its way to you.</p>
                 <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse; margin-top:20px;">
                   <tr><td style="background-color:#f2f2f2; font-weight:bold; width: 150px;">Order Number:</td><td>#${shippedOrderIdentifier}</td></tr>
                   <tr><td style="background-color:#f2f2f2; font-weight:bold;">Shipped Date:</td><td>${order.courierDetails?.shippedAt ? new Date(order.courierDetails.shippedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</td></tr>
@@ -537,12 +566,12 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#FFC107; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">Track My Order</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@samriddhishop.com" style="color:#4CAF50; text-decoration:none;">support@samriddhishop.in</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
               </td>
             </tr>
             <tr>
               <td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">
-                © ${new Date().getFullYear()} SamriddhiShop. All rights reserved.
+                © ${new Date().getFullYear()} Yash Agency. All rights reserved.
               </td>
             </tr>
           </table>
@@ -550,7 +579,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
       break;
     case 'delivered':
       const deliveredOrderIdentifier = order.orderNumber || order._id.toString().slice(-8);
-      subject = `📦 Your SamriddhiShop Order #${deliveredOrderIdentifier} has been delivered!`;
+      subject = `📦 Your Yash Agency Order #${deliveredOrderIdentifier} has been delivered!`;
       htmlBody = `
         <body style="margin:0; padding:0; background-color:#f7f7f7; font-family: Arial, sans-serif;">
           <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color:#ffffff; border-radius:8px; overflow:hidden; margin-top:40px; border: 1px solid #ddd;">
@@ -562,7 +591,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
             <tr>
               <td style="padding:30px;">
                 <p style="font-size:18px; color:#333;">Hi ${userName},</p>
-                <p style="font-size:16px; color:#555;">Great news! Your SamriddhiShop order #${deliveredOrderIdentifier} has been successfully delivered. We hope you enjoy your new products!</p>
+                <p style="font-size:16px; color:#555;">Great news! Your Yash Agency order #${deliveredOrderIdentifier} has been successfully delivered. We hope you enjoy your new products!</p>
                 <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse; margin-top:20px;">
                   <tr><td style="background-color:#f2f2f2; font-weight:bold; width: 150px;">Order Number:</td><td>#${deliveredOrderIdentifier}</td></tr>
                   <tr><td style="background-color:#f2f2f2; font-weight:bold;">Delivery Date:</td><td>${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
@@ -572,12 +601,12 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#28A745; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">View My Order</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@samriddhishop.com" style="color:#4CAF50; text-decoration:none;">support@samriddhishop.in</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
               </td>
             </tr>
             <tr>
               <td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">
-                © ${new Date().getFullYear()} SamriddhiShop. All rights reserved.
+                © ${new Date().getFullYear()} Yash Agency. All rights reserved.
               </td>
             </tr>
           </table>
@@ -585,7 +614,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
       break;
     case 'cancelled':
       const cancelledOrderIdentifier = order.orderNumber || order._id.toString().slice(-8);
-      subject = `❌ Your SamriddhiShop Order #${cancelledOrderIdentifier} has been cancelled.`;
+      subject = `❌ Your Yash Agency Order #${cancelledOrderIdentifier} has been cancelled.`;
       htmlBody = `
         <body style="margin:0; padding:0; background-color:#f7f7f7; font-family: Arial, sans-serif;">
           <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color:#ffffff; border-radius:8px; overflow:hidden; margin-top:40px; border: 1px solid #ddd;">
@@ -597,7 +626,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
             <tr>
               <td style="padding:30px;">
                 <p style="font-size:18px; color:#333;">Hi ${userName},</p>
-                <p style="font-size:16px; color:#555;">Your SamriddhiShop order #${cancelledOrderIdentifier} has been successfully cancelled.</p>
+                <p style="font-size:16px; color:#555;">Your Yash Agency order #${cancelledOrderIdentifier} has been successfully cancelled.</p>
                 <p style="font-size:16px; color:#555;">If you paid for this order online, your refund will be processed and should reflect in your account within 5-7 business days. If you have any questions, please don't hesitate to contact our support team.</p>
                 <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse; margin-top:20px;">
                   <tr><td style="background-color:#f2f2f2; font-weight:bold; width: 150px;">Order Number:</td><td>#${cancelledOrderIdentifier}</td></tr>
@@ -609,14 +638,14 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
                 <p style="font-size:14px; color:#888; margin-top:30px;">We're sorry to see you go. We hope to see you again soon!</p>
               </td>
             </tr>
-            <tr><td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">© ${new Date().getFullYear()} SamriddhiShop. All rights reserved.</td></tr>
+            <tr><td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">© ${new Date().getFullYear()} Yash Agency. All rights reserved.</td></tr>
           </table>
         </body>`;
       break;
     default:
       // For other statuses like 'processing', 'refunded', etc.
       const defaultOrderIdentifier = order.orderNumber || order._id.toString().slice(-8);
-      subject = `🔔 Order Update: Your SamriddhiShop Order #${defaultOrderIdentifier} is now ${status}.`;
+      subject = `🔔 Order Update: Your Yash Agency Order #${defaultOrderIdentifier} is now ${status}.`;
       htmlBody = `
         <body style="margin:0; padding:0; background-color:#f7f7f7; font-family: Arial, sans-serif;">
           <table align="center" cellpadding="0" cellspacing="0" width="600" style="background-color:#ffffff; border-radius:8px; overflow:hidden; margin-top:40px; border: 1px solid #ddd;">
@@ -633,12 +662,12 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#007BFF; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">View Order Details</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@samriddhishop.in" style="color:#4CAF50; text-decoration:none;">support@samriddhishop.in</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:Yashagency25@gmail.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
               </td>
             </tr>
             <tr>
               <td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">
-                © ${new Date().getFullYear()} SamriddhiShop. All rights reserved.
+                © ${new Date().getFullYear()} Yash Agency. All rights reserved.
               </td>
             </tr>
           </table>
@@ -648,7 +677,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
 
   try {
     await emailTransporter.sendMail({
-      from: `"SamriddhiShop" <${process.env.EMAIL_USER}>`,
+      from: `"Yash Agency" <${process.env.EMAIL_USER}>`,
       to: userEmail,
       subject: subject,
       html: htmlBody,
@@ -917,6 +946,11 @@ app.post('/api/login', validate(loginSchema), async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check if salesman is active
+    if (user.role === 'salesman' && user.isActive === false) {
+      return res.status(403).json({ error: 'Account is disabled. Please contact admin.' });
+    }
+
     // 🔥 Increase sessionVersion so ALL old tokens become invalid immediately
     user.sessionVersion = (user.sessionVersion || 0) + 1;
     await user.save();
@@ -1106,6 +1140,7 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
         userId: req.user._id,
         items: orderItems,
         total: total, // Use the verified total from the request
+        orderBy: 'self',
         status: 'pending',
         shippingAddress: req.body.shippingAddress,
         paymentMethod: req.body.paymentMethod || 'cod',
@@ -1156,7 +1191,7 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
 
 // --- Admin New Order Notification ---
 const sendNewOrderAdminNotification = async (order) => {
-	const adminEmail = process.env.ADMIN_EMAIL || 'support@samriddhishop.in';
+	const adminEmail = process.env.ADMIN_EMAIL || 'Yashagency25@gmail.com';
 	const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
 	const adminOrderLink = `${FRONTEND_URL}/admin/orders`;
 
@@ -1195,7 +1230,7 @@ const sendNewOrderAdminNotification = async (order) => {
             <tr><td style="background-color:#007BFF; padding:20px; text-align:center; color:#ffffff; font-size:24px;"><strong>New Order Notification</strong></td></tr>
             <tr>
               <td style="padding:30px;">
-                <p style="font-size:18px; color:#333;">A new order has been placed on SamriddhiShop.</p>
+                <p style="font-size:18px; color:#333;">A new order has been placed on Yash Agency.</p>
                 <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse; margin-top:20px;">
                   <tr><td style="background-color:#f2f2f2; font-weight:bold; width: 150px;">Order Number:</td><td>#${orderIdentifier}</td></tr>
                   <tr><td style="background-color:#f2f2f2; font-weight:bold;">Order Total:</td><td>₹${order.total.toFixed(2)}</td></tr>
@@ -1210,12 +1245,12 @@ const sendNewOrderAdminNotification = async (order) => {
                 </p>
               </td>
             </tr>
-            <tr><td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">© ${new Date().getFullYear()} SamriddhiShop. All rights reserved.</td></tr>
+            <tr><td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">© ${new Date().getFullYear()} Yash Agency. All rights reserved.</td></tr>
           </table>
         </body>`;
 
 			await emailTransporter.sendMail({
-				from: `"SamriddhiShop Orders" <${process.env.EMAIL_USER}>`,
+				from: `"Yash Agency Orders" <${process.env.EMAIL_USER}>`,
 				to: adminEmail,
 				subject: subject,
 				html: htmlBody,
@@ -1288,7 +1323,7 @@ app.post('/api/forgot-password', async (req, res) => {
     const message = `Click to reset your password:\n\n${resetUrl}\n\nIf not requested, please ignore.`;
 
     await emailTransporter.sendMail({
-      from: `"SamriddhiShop Support" <${process.env.EMAIL_USER}>`,
+      from: `"Yash Agency Support" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Password Reset Request',
       text: message,
@@ -1559,7 +1594,7 @@ app.patch('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
 
 // --- Admin Order Cancellation Notification ---
 const sendOrderCancellationAdminNotification = async (order, user) => {
-  const adminEmail = process.env.ADMIN_EMAIL || 'support@samriddhishop.in';
+  const adminEmail = process.env.ADMIN_EMAIL || 'Yashagency25@gmail.com';
   const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
   const adminOrderLink = `${FRONTEND_URL}/admin/orders`;
 
@@ -1583,11 +1618,11 @@ const sendOrderCancellationAdminNotification = async (order, user) => {
                 <p style="text-align:center; margin-top:30px;"><a href="${adminOrderLink}" style="background-color:#6c757d; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">View Order Details</a></p>
               </td>
             </tr>
-            <tr><td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">© ${new Date().getFullYear()} SamriddhiShop. All rights reserved.</td></tr>
+            <tr><td style="background-color:#f2f2f2; text-align:center; padding:15px; font-size:12px; color:#777;">© ${new Date().getFullYear()} Yash Agency. All rights reserved.</td></tr>
           </table>
         </body>`;
 
-      await emailTransporter.sendMail({ from: `"SamriddhiShop Alerts" <${process.env.EMAIL_USER}>`, to: adminEmail, subject, html: htmlBody });
+      await emailTransporter.sendMail({ from: `"Yash Agency Alerts" <${process.env.EMAIL_USER}>`, to: adminEmail, subject, html: htmlBody });
     } catch (error) {
       console.error(`Failed to send order cancellation admin email for order ${order._id}:`, error);
     }
@@ -1951,10 +1986,10 @@ const shippingZoneSchema = new mongoose.Schema({
 // Settings Schema
 const settingsSchema = new mongoose.Schema({
   shippingCost: { type: Number, default: 0 },
-  phone: { type: String, default: '+91 9580889615' },
-  email: { type: String, default: 'support@samriddhishop.com' },
-  instagram: { type: String, default: 'https://www.instagram.com/samriddhishop?igsh=cGU3bWFiajN2emM3' },
-  facebook: { type: String, default: 'https://www.facebook.com/profile.php?id=61582670666605' },
+  phone: { type: String, default: 'NA' },
+  email: { type: String, default: 'NA' },
+  instagram: { type: String, default: 'NA' },
+  facebook: { type: String, default: 'NA' },
   shippingZones: [shippingZoneSchema], // Add shipping zones array
   updatedAt: { type: Date, default: Date.now }
 });
@@ -1964,13 +1999,13 @@ const Settings = mongoose.model('Settings', settingsSchema);
 // Banner Schema
 const bannerSchema = new mongoose.Schema({
   desktop: {
-    title: { type: String, default: 'Welcome to SamriddhiShop' },
+    title: { type: String, default: 'Welcome to Yash Agency' },
     subtitle: { type: String, default: 'Discover amazing products at great prices' },
     backgroundImage: { type: String, default: '' },
     backgroundVideo: { type: String, default: '' },
   },
   mobile: {
-    title: { type: String, default: 'Welcome to SamriddhiShop' },
+    title: { type: String, default: 'Welcome to Yash Agency' },
     subtitle: { type: String, default: 'Amazing products, great prices' },
     backgroundImage: { type: String, default: '' },
     backgroundVideo: { type: String, default: '' },
@@ -2007,10 +2042,10 @@ app.get('/api/admin/products', authenticateToken, adminAuth, async (req, res) =>
 app.post('/api/admin/products', authenticateToken, adminAuth, async (req, res) => {
   try {
     // Explicitly destructure fields from req.body for security and clarity
-    const { name, description, price, originalPrice, discountPercentage, imageUrl, images, category, soldBy, stock, variants, highlights, specifications, warranty, showHighlights, showSpecifications, showWarranty, enabled } = req.body;
+    const { name, description, price, minSellPrice, originalPrice, discountPercentage, imageUrl, images, category, soldBy, stock, variants, highlights, specifications, warranty, showHighlights, showSpecifications, showWarranty, enabled } = req.body;
 
     const product = new Product({
-      name, description, price, originalPrice, discountPercentage, imageUrl, images, category, soldBy, stock, variants, highlights, specifications, warranty, showHighlights, showSpecifications, showWarranty, enabled
+      name, description, price, minSellPrice, originalPrice, discountPercentage, imageUrl, images, category, soldBy, stock, variants, highlights, specifications, warranty, showHighlights, showSpecifications, showWarranty, enabled
     });
 
     await product.save();
@@ -2467,10 +2502,10 @@ app.post('/api/contact', validate(contactSchemaZod),
     }
 
     try {
-      const adminEmail = process.env.ADMIN_EMAIL || 'support@samriddhishop.in';
+      const adminEmail = process.env.ADMIN_EMAIL || 'Yashagency25@gmail.com';
 
       await emailTransporter.sendMail({
-        from: `"SamriddhiShop Contact Form" <${process.env.EMAIL_USER}>`,
+        from: `"Yash Agency Contact Form" <${process.env.EMAIL_USER}>`,
         to: adminEmail,
         replyTo: email, // Set the user's email as the reply-to address
         subject: `New Contact Form Submission:  ${subject}`,
@@ -2548,6 +2583,250 @@ app.post('/api/create-admin', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create admin account' });
+  }
+});
+
+// --- Salesman Management Routes (Admin Only) ---
+
+const createSalesmanSchema = z.object({
+  body: z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(6),
+    phone: z.string().optional(),
+    maxDiscountPercent: z.number().optional(),
+    address: z.string().optional(),
+    pincode: z.string().regex(/^\d{6}$/, "Pincode must be 6 digits").optional().or(z.literal(''))
+  })
+});
+
+app.post('/api/admin/salesmen', authenticateToken, adminAuth, validate(createSalesmanSchema), async (req, res) => {
+  try {
+    const { name, email, password, phone, maxDiscountPercent, address, pincode } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    const salesman = new User({
+      name,
+      email,
+      password, // Hashed by pre-save
+      phone,
+      role: 'salesman',
+      isEmailVerified: true,
+      isActive: true,
+      maxDiscountPercent: maxDiscountPercent || 0,
+      createdByAdmin: req.user._id,
+      salesmanAddress: address,
+      salesmanPincode: pincode
+    });
+
+    await salesman.save();
+    res.status(201).json({ message: 'Salesman account created', salesman: { id: salesman._id, name: salesman.name, email: salesman.email } });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create salesman' });
+  }
+});
+
+app.get('/api/admin/salesmen', authenticateToken, adminAuth, async (req, res) => {
+  try {
+    const salesmen = await User.find({ role: 'salesman' }).select('-password').sort({ createdAt: -1 });
+    res.json(salesmen);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch salesmen' });
+  }
+});
+
+app.patch('/api/admin/salesmen/:id', authenticateToken, adminAuth, async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== 'boolean') return res.status(400).json({ error: 'isActive must be a boolean' });
+
+    const salesman = await User.findByIdAndUpdate(req.params.id, { isActive }, { new: true }).select('-password');
+    if (!salesman) return res.status(404).json({ error: 'Salesman not found' });
+
+    res.json({ message: `Salesman ${isActive ? 'enabled' : 'disabled'}`, salesman });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update salesman status' });
+  }
+});
+
+app.get('/api/salesman/customers', authenticateToken, salesmanAuth, async (req, res) => {
+  try {
+    const { search } = req.query;
+    if (!search) return res.json([]);
+
+    const customers = await User.find({
+      role: 'customer',
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ]
+    }).select('name email phone addresses');
+
+    res.json(customers);
+  } catch (error) {
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+const createCustomerBySalesmanSchema = z.object({
+  body: z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    phone: z.string().min(10),
+    address: z.string().optional(),
+    pincode: z.string().regex(/^\d{6}$/, "Pincode must be 6 digits").optional().or(z.literal(''))
+  })
+});
+
+app.post('/api/salesman/customers', authenticateToken, salesmanAuth, validate(createCustomerBySalesmanSchema), async (req, res) => {
+  try {
+    const { name, email, phone, address, pincode } = req.body;
+
+    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Customer with this email or phone already exists' });
+    }
+
+    const password = crypto.randomBytes(8).toString('hex');
+    const customer = new User({
+      name,
+      email,
+      phone,
+      password,
+      role: 'customer',
+      isEmailVerified: true
+    });
+
+    if (address && pincode) {
+      customer.addresses.push({
+        name,
+        mobileNumber: phone,
+        street: address,
+        city: 'N/A', // Defaulting as it is required in schema but not asked
+        zipCode: pincode,
+        country: 'India'
+      });
+    }
+
+    await customer.save();
+
+    res.status(201).json({ message: 'Customer created successfully', customer: { _id: customer._id, name: customer.name, email: customer.email, phone: customer.phone } });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create customer' });
+  }
+});
+
+// --- Salesman Order Routes ---
+
+const salesmanOrderSchema = z.object({
+  body: z.object({
+    customerPhone: z.string().min(10),
+    items: z.array(z.object({
+      productId: z.string(),
+      quantity: z.number().min(1),
+      finalPrice: z.number().min(0)
+    })).min(1),
+    shippingAddress: z.object({
+      name: z.string().optional(),
+      mobileNumber: z.string().optional(),
+      street: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      zipCode: z.string().optional(),
+      country: z.string().optional()
+    }).optional()
+  })
+});
+
+app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(salesmanOrderSchema), async (req, res) => {
+  try {
+    const { customerPhone, items, shippingAddress } = req.body;
+
+    // 1. Find or Create Customer
+    let customer = await User.findOne({ phone: customerPhone });
+    if (!customer) {
+      const generatedEmail = `${customerPhone}@guest.Yash Agency.in`; // Dummy email
+      const generatedPassword = crypto.randomBytes(8).toString('hex');
+      customer = new User({
+        name: `Guest ${customerPhone}`,
+        email: generatedEmail,
+        phone: customerPhone,
+        password: generatedPassword,
+        role: 'customer',
+        isEmailVerified: true
+      });
+      await customer.save();
+    }
+
+    // 2. Validate Items and Prices
+    let total = 0;
+    const orderItems = [];
+
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` });
+
+      // Price Protection Check
+      if (item.finalPrice < (product.minSellPrice || 0)) {
+        return res.status(400).json({ error: `Price for ${product.name} cannot be less than ${product.minSellPrice}` });
+      }
+
+      total += item.finalPrice * item.quantity;
+      orderItems.push({
+        productId: product._id,
+        name: product.name,
+        price: item.finalPrice, // Store the salesman's custom price
+        quantity: item.quantity
+      });
+    }
+
+    // 3. Create Order
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const counter = await Counter.findOneAndUpdate(
+      { date: dateStr },
+      { $inc: { count: 1 } },
+      { upsert: true, new: true }
+    );
+    const orderNumber = `${dateStr}${String(counter.count).padStart(4, '0')}`;
+
+    const order = new Order({
+      orderNumber,
+      userId: customer._id,
+      items: orderItems,
+      total,
+      shippingAddress,
+      orderBy: 'salesman',
+      status: 'pending',
+      paymentMethod: 'cod',
+      orderSource: 'salesman',
+      salesmanId: req.user._id,
+      salesmanName: req.user.name
+    });
+
+    await order.save();
+
+    res.status(201).json({ message: 'Order placed successfully', orderId: order._id, orderNumber: order.orderNumber });
+
+  } catch (error) {
+    console.error('Salesman order error:', error);
+    res.status(500).json({ error: 'Failed to place order' });
+  }
+});
+
+app.get('/api/salesman/orders', authenticateToken, salesmanAuth, async (req, res) => {
+  try {
+    const orders = await Order.find({ salesmanId: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name phone email');
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
 
