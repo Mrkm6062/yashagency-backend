@@ -187,7 +187,8 @@ const userSchema = new mongoose.Schema({
   salesmanPincode: { type: String },
 
   // 🔥 Added for secure session management
-  sessionVersion: { type: Number, default: 0 }
+  sessionVersion: { type: Number, default: 0 },
+  activeSessions: { type: [String], default: [] }
 });
 
 // Hash password if modified
@@ -372,13 +373,18 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid token user not found' });
     }
 
-    // 🔥 3. Validate sessionVersion to block copied/old tokens
-    if (decoded.sessionVersion !== user.sessionVersion) {
+    // 🔥 3. Validate session (Support for multiple sessions)
+    if (decoded.sessionId) {
+      if (!user.activeSessions || !user.activeSessions.includes(decoded.sessionId)) {
+        return res.status(401).json({ error: 'Session expired. Please login again.' });
+      }
+    } else if (decoded.sessionVersion !== user.sessionVersion) {
       return res.status(401).json({ error: 'Session expired. Please login again.' });
     }
 
     // Authenticated user stored in request
     req.user = user;
+    req.sessionId = decoded.sessionId;
     next();
 
   } catch (error) {
@@ -951,8 +957,13 @@ app.post('/api/login', validate(loginSchema), async (req, res) => {
       return res.status(403).json({ error: 'Account is disabled. Please contact admin.' });
     }
 
-    // 🔥 Increase sessionVersion so ALL old tokens become invalid immediately
-    user.sessionVersion = (user.sessionVersion || 0) + 1;
+    // Manage Active Sessions (Limit to 3)
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    if (!user.activeSessions) user.activeSessions = [];
+    user.activeSessions.push(sessionId);
+    if (user.activeSessions.length > 3) {
+      user.activeSessions.shift(); // Remove oldest session
+    }
     await user.save();
 
     // Generate secure login JWT
@@ -960,7 +971,7 @@ app.post('/api/login', validate(loginSchema), async (req, res) => {
       { 
         userId: user._id,
         role: user.role,
-        sessionVersion: user.sessionVersion,
+        sessionId: sessionId,
         type: "login"   // prevents reset-token abuse
       },
       process.env.JWT_SECRET,
@@ -989,8 +1000,13 @@ app.post('/api/login', validate(loginSchema), async (req, res) => {
 
 app.post("/api/logout", authenticateToken, async (req, res) => {
   try {
-    // 🔥 Increase sessionVersion to invalidate all tokens immediately
-    req.user.sessionVersion += 1;
+    if (req.sessionId) {
+      // Remove only the current session
+      req.user.activeSessions = req.user.activeSessions.filter(id => id !== req.sessionId);
+    } else {
+      // Legacy: Increase sessionVersion to invalidate all tokens
+      req.user.sessionVersion = (req.user.sessionVersion || 0) + 1;
+    }
     await req.user.save();
 
     res.json({ message: "Logged out successfully" });
@@ -1359,6 +1375,7 @@ app.post('/api/reset-password/:token', async (req, res) => {
 
     // 🔥 Invalidate old tokens by bumping sessionVersion
     user.sessionVersion = (user.sessionVersion || 0) + 1;
+    user.activeSessions = []; // Clear all active sessions
 
     // Remove reset token
     user.passwordResetToken = undefined;
