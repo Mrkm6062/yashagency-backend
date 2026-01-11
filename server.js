@@ -25,7 +25,7 @@ if (!process.env.JWT_SECRET) {
 import OTP from './models/otp.js'; 
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 
 // Trust the first proxy in front of the app (e.g., on Render, Heroku)
 // This is required for express-rate-limit to work correctly.
@@ -67,6 +67,7 @@ app.use(helmet({
 
 const whitelist = [
   'http://localhost:3000',
+  'http://localhost:3003',
   'http://localhost:5173', // Add this for Vite's default dev server
   process.env.FRONTEND_URL,
   'https://yashagencydev.netlify.app'

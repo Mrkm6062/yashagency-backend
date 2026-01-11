@@ -7,7 +7,7 @@ dotenv.config();
 // --- Configuration ---
 const API_KEY = process.env.DATA_GOV_IN_API_KEY; // Make sure to set this in your .env file
 const API_URL = 'https://api.data.gov.in/resource/6176ee09-3d56-4a3b-8115-21841576b2f6';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/samriddhishop';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/yashdb';
 const RECORDS_PER_FETCH = 1000; // The API limit per request
 
 // --- Pincode Schema ---
