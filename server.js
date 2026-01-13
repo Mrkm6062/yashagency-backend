@@ -1131,6 +1131,12 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
         });
       }
 
+      // Check Minimum Order Amount
+      const settings = await Settings.findOne();
+      if (settings && settings.minOrderAmount > 0 && subtotal < settings.minOrderAmount) {
+        return res.status(400).json({ error: `Minimum order amount is ₹${settings.minOrderAmount}` });
+      }
+
       // Recalculate the final total on the backend for security
       const calculatedTotal = subtotal + (shippingCost || 0) - (discount || 0) + (tax || 0);
 
@@ -2004,6 +2010,7 @@ const shippingZoneSchema = new mongoose.Schema({
 // Settings Schema
 const settingsSchema = new mongoose.Schema({
   shippingCost: { type: Number, default: 0 },
+  minOrderAmount: { type: Number, default: 0 },
   phone: { type: String, default: 'NA' },
   email: { type: String, default: 'NA' },
   instagram: { type: String, default: 'NA' },
