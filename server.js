@@ -1404,6 +1404,9 @@ const sendNewOrderAdminNotification = async (order) => {
 app.post('/api/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
     const user = await User.findOne({ email });
 
     // Do NOT reveal if user exists
@@ -1437,7 +1440,7 @@ app.post('/api/forgot-password', async (req, res) => {
 
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ error: 'Error sending password reset email.' });
+    res.status(500).json({ error: 'Error sending password reset email.', details: error.message });
   }
 });
 
