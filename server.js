@@ -2115,7 +2115,12 @@ app.post('/api/admin/upload', authenticateToken, adminAuth, upload.single('image
       res.status(500).json({ error: 'Failed to upload image to GCS' });
     });
 
-    blobStream.on('finish', () => {
+    blobStream.on('finish', async () => {
+      try {
+        await blob.makePublic();
+      } catch (err) {
+        console.warn(`Failed to make ${filename} public. Ensure bucket allows ACLs or set public access policy: ${err.message}`);
+      }
       const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET}/${filename}`;
       res.json({ imageUrl: publicUrl });
     });
