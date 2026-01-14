@@ -2542,6 +2542,8 @@ app.get('/api/wishlist', authenticateToken, async (req, res) => {
     const processedWishlist = await Promise.all((user.wishlist || []).map(p => processProductImages(p)));
     
     res.json({ 
+      wishlist: processedWishlist,
+      products: processedWishlist
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get wishlist' });
@@ -2551,14 +2553,15 @@ app.get('/api/wishlist', authenticateToken, async (req, res) => {
 app.get('/api/cart', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate('cart.productId');
-    const cartItems = user.cart.map(item => ({
-      ...item.productId.toObject(),
+    const cartItems = await Promise.all(user.cart.map(async (item) => {
+      if (!item.productId) return null;
+      const processedProduct = await processProductImages(item.productId);
       return {
-      ...processedProduct,
-      quantity: item.quantity
+        ...processedProduct,
+        quantity: item.quantity
       };
     }));
-    res.json({ cart: cartItems });
+    res.json({ cart: cartItems.filter(Boolean) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get cart' });
   }
