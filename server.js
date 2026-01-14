@@ -144,6 +144,43 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
+// --- GCS Helper Functions ---
+
+// Extract the object path from a full GCS URL or return the string if it's already a path
+const extractStoragePath = (fullUrl) => {
+  if (!fullUrl || typeof fullUrl !== 'string') return fullUrl;
+  const prefix = `https://storage.googleapis.com/${process.env.GCS_BUCKET}/`;
+  if (fullUrl.startsWith(prefix)) {
+    // Remove prefix and query params (signature, expiry, etc.)
+    const pathWithQuery = fullUrl.substring(prefix.length);
+    return pathWithQuery.split('?')[0];
+  }
+  return fullUrl;
+};
+
+// Generate a signed URL for a given path (or re-sign if it's an old GCS URL)
+const signUrl = async (pathOrUrl) => {
+  if (!pathOrUrl) return pathOrUrl;
+  
+  // If it's a full GCS URL, extract the path first so we can re-sign it
+  const path = extractStoragePath(pathOrUrl);
+
+  // If it still looks like an external URL (not our bucket), return as is
+  if (path.startsWith('http')) return path;
+
+  try {
+    // Generate a fresh signed URL valid for 1 day
+    const [url] = await bucket.file(path).getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 1000 * 60 * 60 * 24, // 1 day
+    });
+    return url;
+  } catch (error) {
+    console.error(`Error signing URL for path ${path}:`, error.message);
+    return path; // Fallback to original path if signing fails
+  }
+};
+
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Schemas
@@ -721,7 +758,8 @@ app.get('/api/products', async (req, res) => {
       $or: [{ enabled: true }, { enabled: { $exists: false } }]
     }).sort({ createdAt: -1 });
 
-    res.json(products);
+    const processedProducts = await Promise.all(products.map(p => processProductImages(p)));
+    res.json(processedProducts);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
   }
@@ -734,7 +772,8 @@ app.get('/api/products/:id', async (req, res) => {
     if (!product || (product.enabled === false)) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json(product);
+    const processedProduct = await processProductImages(product);
+    res.json(processedProduct);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch product' });
   }
@@ -1066,7 +1105,19 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
     const orders = await Order.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .populate('items.productId');
-    res.json(orders);
+
+    // Process images inside the populated products
+    const processedOrders = await Promise.all(orders.map(async (order) => {
+      const orderObj = order.toObject();
+      if (orderObj.items) {
+        orderObj.items = await Promise.all(orderObj.items.map(async (item) => {
+          if (item.productId) item.productId = await processProductImages(item.productId);
+          return item;
+        }));
+      }
+      return orderObj;
+    }));
+    res.json(processedOrders);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
@@ -1086,7 +1137,14 @@ app.get('/api/orders/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    res.json(order);
+    const orderObj = order.toObject();
+    if (orderObj.items) {
+      orderObj.items = await Promise.all(orderObj.items.map(async (item) => {
+        if (item.productId) item.productId = await processProductImages(item.productId);
+        return item;
+      }));
+    }
+    res.json(orderObj);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch order details' });
   }
@@ -2068,7 +2126,8 @@ const Contact = mongoose.model('Contact', contactSchema);
 app.get('/api/admin/products', authenticateToken, adminAuth, async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
-    res.json(products);
+    const processedProducts = await Promise.all(products.map(p => processProductImages(p)));
+    res.json(processedProducts);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
   }
@@ -2080,8 +2139,16 @@ app.post('/api/admin/products', authenticateToken, adminAuth, async (req, res) =
     // Explicitly destructure fields from req.body for security and clarity
     const { name, description, price, minSellPrice, originalPrice, discountPercentage, imageUrl, images, category, soldBy, stock, variants, highlights, specifications, warranty, showHighlights, showSpecifications, showWarranty, enabled } = req.body;
 
+    // Clean URLs to store only paths
+    const cleanImageUrl = extractStoragePath(imageUrl);
+    const cleanImages = images ? images.map(img => extractStoragePath(img)) : [];
+
     const product = new Product({
-      name, description, price, minSellPrice, originalPrice, discountPercentage, imageUrl, images, category, soldBy, stock, variants, highlights, specifications, warranty, showHighlights, showSpecifications, showWarranty, enabled
+      name, description, price, minSellPrice, originalPrice, discountPercentage, 
+      imageUrl: cleanImageUrl, 
+      images: cleanImages, 
+      category, soldBy, stock, variants, highlights, specifications, warranty, 
+      showHighlights, showSpecifications, showWarranty, enabled
     });
 
     await product.save();
@@ -2128,11 +2195,18 @@ app.put('/api/admin/products/:id', authenticateToken, adminAuth, async (req, res
     // For updates, it's also good practice to be explicit.
     // We can create an update object with all the fields from the body.
     const updateData = req.body;
+    
+    // Clean URLs before saving
+    if (updateData.imageUrl) updateData.imageUrl = extractStoragePath(updateData.imageUrl);
+    if (updateData.images) updateData.images = updateData.images.map(img => extractStoragePath(img));
 
     const product = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
+    
+    // No need to sign here as the frontend usually refetches or uses local state, 
+    // but consistent return is good.
     res.json({ message: 'Product updated successfully', product });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update product' });
@@ -2465,9 +2539,9 @@ app.put('/api/admin/banner', authenticateToken, adminAuth, async (req, res) => {
 app.get('/api/wishlist', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate('wishlist');
+    const processedWishlist = await Promise.all((user.wishlist || []).map(p => processProductImages(p)));
+    
     res.json({ 
-      wishlist: user.wishlist || [],
-      products: user.wishlist || []
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get wishlist' });
@@ -2479,7 +2553,10 @@ app.get('/api/cart', authenticateToken, async (req, res) => {
     const user = await User.findById(req.user._id).populate('cart.productId');
     const cartItems = user.cart.map(item => ({
       ...item.productId.toObject(),
+      return {
+      ...processedProduct,
       quantity: item.quantity
+      };
     }));
     res.json({ cart: cartItems });
   } catch (error) {
