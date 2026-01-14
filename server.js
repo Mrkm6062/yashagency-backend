@@ -11,6 +11,8 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import webpush from 'web-push';
 import nodemailer from 'nodemailer';
+import { Storage } from '@google-cloud/storage';
+import multer from 'multer';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -132,6 +134,15 @@ const emailTransporter = nodemailer.createTransport({
   },
 });
 
+// GCS Configuration
+const storage = new Storage({
+  keyFilename: process.env.GCS_KEYFILE_PATH,
+});
+const bucket = storage.bucket(process.env.GCS_BUCKET);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+});
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -2081,6 +2092,38 @@ app.post('/api/admin/products', authenticateToken, adminAuth, async (req, res) =
     console.error('Error adding product:', error); 
     // Send a more descriptive error to the client
     res.status(500).json({ error: 'Failed to add product. Please check all fields.', details: error.message });
+  }
+});
+
+// Admin - Upload Image to GCS
+app.post('/api/admin/upload', authenticateToken, adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const folder = 'yashproduct';
+    const originalName = req.file.originalname.replace(/\s+/g, '-');
+    const filename = `${folder}/${Date.now()}-${originalName}`;
+    const blob = bucket.file(filename);
+
+    const blobStream = blob.createWriteStream({
+      resumable: false,
+      contentType: req.file.mimetype,
+    });
+
+    blobStream.on('error', (err) => {
+      console.error('GCS Upload Error:', err);
+      res.status(500).json({ error: 'Failed to upload image to GCS' });
+    });
+
+    blobStream.on('finish', () => {
+      const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET}/${filename}`;
+      res.json({ imageUrl: publicUrl });
+    });
+
+    blobStream.end(req.file.buffer);
+  } catch (error) {
+    console.error('Upload route error:', error);
+    res.status(500).json({ error: 'Internal server error during upload' });
   }
 });
 
