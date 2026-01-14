@@ -181,6 +181,18 @@ const signUrl = async (pathOrUrl) => {
   }
 };
 
+// Helper to process a single product and sign its images
+const processProductImages = async (product) => {
+  if (!product) return product;
+  const p = product.toObject ? product.toObject() : product;
+
+  if (p.imageUrl) p.imageUrl = await signUrl(p.imageUrl);
+  if (p.images && p.images.length > 0) {
+    p.images = await Promise.all(p.images.map(img => signUrl(img)));
+  }
+  return p;
+};
+
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Schemas
