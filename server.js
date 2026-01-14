@@ -45,15 +45,15 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         process.env.FRONTEND_URL,
+        "https://samriddhishop.info",
         "https://Yash Agency.in",
-        "https://storage.googleapis.com"
+        "https://storage.googleapis.com",
         "https://via.placeholder.com"
       ],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       frameSrc: ["'self'"], // Allow Razorpay's iframe
       frameAncestors: ["'self'"], // Mitigates clickjacking
-      requireTrustedTypesFor: ["'script'"], // Mitigate DOM-based XSS with Trusted Types
       upgradeInsecureRequests: [],
     },
   },
@@ -71,9 +71,9 @@ const whitelist = [
   'http://localhost:3000',
   'http://localhost:3003',
   'http://localhost:5173', // Add this for Vite's default dev server
+  'https://yashagencydev.netlify.app',
+  'https://samriddhishop.info',
   process.env.FRONTEND_URL,
-  'https://yashagencydev.netlify.app'
-
 ];
 
 const corsOptions = {
