@@ -46,8 +46,7 @@ app.use(helmet({
         "'self'",
         process.env.FRONTEND_URL,
         "https://Yash Agency.in",
-        "https://Yash Agency-backend.onrender.com",
-        "https://www.facebook.com"
+        "https://storage.googleapis.com"
       ],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
