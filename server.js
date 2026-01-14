@@ -2105,27 +2105,17 @@ app.post('/api/admin/upload', authenticateToken, adminAuth, upload.single('image
     const filename = `${folder}/${Date.now()}-${originalName}`;
     const blob = bucket.file(filename);
 
-    const blobStream = blob.createWriteStream({
-      resumable: false,
+    await blob.save(req.file.buffer, {
       contentType: req.file.mimetype,
+      resumable: false,
     });
 
-    blobStream.on('error', (err) => {
-      console.error('GCS Upload Error:', err);
-      res.status(500).json({ error: 'Failed to upload image to GCS' });
+    const [url] = await blob.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 365, // 1 year
     });
 
-    blobStream.on('finish', async () => {
-      try {
-        await blob.makePublic();
-      } catch (err) {
-        console.warn(`Failed to make ${filename} public. Ensure bucket allows ACLs or set public access policy: ${err.message}`);
-      }
-      const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET}/${filename}`;
-      res.json({ imageUrl: publicUrl });
-    });
-
-    blobStream.end(req.file.buffer);
+    res.json({ imageUrl: url });
   } catch (error) {
     console.error('Upload route error:', error);
     res.status(500).json({ error: 'Internal server error during upload' });
