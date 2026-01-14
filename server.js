@@ -39,7 +39,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://connect.facebook.net"],
+      scriptSrc: ["'self'", "https://connect.facebook.net", "https://cdn.jsdelivr.net"],
       styleSrc: ["'self'", "'unsafe-inline'"], // 'unsafe-inline' is often needed for CSS-in-JS
       imgSrc: ["'self'", "data:", "https:", "https://storage.googleapis.com"],
       connectSrc: [
