@@ -1404,6 +1404,7 @@ const sendNewOrderAdminNotification = async (order) => {
 app.post('/api/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
+    console.log(`Password reset requested for: ${email}`);
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
