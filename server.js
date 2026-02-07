@@ -754,6 +754,114 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
   }
 };
 
+const sendInvoiceEmail = async (userEmail, userName, order) => {
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn('Email service not configured. Skipping invoice email.');
+    return;
+  }
+
+  const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
+  const subject = `Invoice for Order #${orderIdentifier} - Yash Agency`;
+  const orderDate = new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const itemsHtml = order.items.map((item, index) => `
+    <tr>
+      <td style="padding:8px; border-bottom:1px solid #ddd;">${index + 1}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd;">${item.name}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">${item.quantity}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">₹${item.price.toFixed(2)}</td>
+      <td style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">₹${(item.price * item.quantity).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const htmlBody = `
+    <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; background-color: #f9f9f9; padding: 20px;">
+      <div style="max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px;">
+          <h1 style="color: #2c3e50; margin: 0; font-size: 28px;">INVOICE</h1>
+          <p style="margin: 5px 0; color: #7f8c8d; font-size: 16px;">Yash Agency</p>
+        </div>
+        
+        <table style="width: 100%; margin-bottom: 30px;">
+          <tr>
+            <td style="vertical-align: top; width: 50%;">
+              <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">Billed To:</h3>
+              <p style="margin: 0; color: #555;">
+                <strong>${userName}</strong><br>
+                ${order.shippingAddress ? `
+                  ${order.shippingAddress.street}<br>
+                  ${order.shippingAddress.city}, ${order.shippingAddress.state} - ${order.shippingAddress.zipCode}<br>
+                  Phone: ${order.shippingAddress.mobileNumber}
+                ` : 'Address not provided'}
+              </p>
+            </td>
+            <td style="vertical-align: top; text-align: right; width: 50%;">
+              <p style="margin: 0; color: #555;">
+                <strong>Invoice No:</strong> INV-${orderIdentifier}<br>
+                <strong>Order No:</strong> #${orderIdentifier}<br>
+                <strong>Date:</strong> ${orderDate}<br>
+                <strong>Payment Method:</strong> ${order.paymentMethod.toUpperCase()}
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+          <thead>
+            <tr style="background-color: #f8f9fa;">
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd; color: #2c3e50;">#</th>
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd; color: #2c3e50;">Item</th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd; color: #2c3e50;">Qty</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd; color: #2c3e50;">Price</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd; color: #2c3e50;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" style="padding: 12px; text-align: right; border-top: 2px solid #ddd;"><strong>Subtotal</strong></td>
+              <td style="padding: 12px; text-align: right; border-top: 2px solid #ddd;">₹${(order.total - (order.shippingCost || 0) + (order.discount || 0)).toFixed(2)}</td>
+            </tr>
+            ${order.shippingCost > 0 ? `
+            <tr>
+              <td colspan="4" style="padding: 8px 12px; text-align: right; color: #666;">Shipping</td>
+              <td style="padding: 8px 12px; text-align: right; color: #666;">₹${order.shippingCost.toFixed(2)}</td>
+            </tr>` : ''}
+            ${order.discount > 0 ? `
+            <tr>
+              <td colspan="4" style="padding: 8px 12px; text-align: right; color: #27ae60;">Discount</td>
+              <td style="padding: 8px 12px; text-align: right; color: #27ae60;">-₹${order.discount.toFixed(2)}</td>
+            </tr>` : ''}
+            <tr style="background-color: #f8f9fa;">
+              <td colspan="4" style="padding: 15px 12px; text-align: right; color: #2c3e50; font-size: 18px;"><strong>Total Amount</strong></td>
+              <td style="padding: 15px 12px; text-align: right; color: #2c3e50; font-size: 18px;"><strong>₹${order.total.toFixed(2)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #7f8c8d; font-size: 12px;">
+          <p style="margin-bottom: 5px;">Thank you for shopping with Yash Agency!</p>
+          <p style="margin-bottom: 5px;">SAI SIDDHI CHOWK, DHANKAWADI, PUNE - 411001</p>
+          <p>Contact: 7249635724 / 8329272380 | Email: Yashagency25@gmail.com</p>
+        </div>
+      </div>
+    </body>
+  `;
+
+  try {
+    await emailTransporter.sendMail({
+      from: `"Yash Agency Accounts" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: subject,
+      html: htmlBody,
+    });
+  } catch (error) {
+    console.error(`Failed to send invoice email to ${userEmail}:`, error);
+  }
+};
+
 // API Routes
 
 // Get all products
@@ -1546,11 +1654,11 @@ const updateOrderStatusSchema = z.object({
   })
 });
 
-// Update order status (for admin/testing)
+// Update order status (for admin)
 app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatusSchema),
   async (req, res) => {
     try {
-      const { status, courierName, trackingNumber, estimatedDelivery, notes } = req.body;
+      const { status, courierName, trackingNumber, estimatedDelivery, notes, paymentStatus } = req.body;
       const order = await Order.findById(req.params.id);
       
       if (!order) {
@@ -1576,7 +1684,11 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
 
       // If a COD order is marked as delivered, automatically mark payment as received
       if (status === 'delivered' && order.paymentMethod === 'cod') {
-        order.paymentStatus = 'received';
+        if (paymentStatus) {
+          order.paymentStatus = paymentStatus;
+        } else {
+          order.paymentStatus = 'received';
+        }
       }
 
       // If status is shipped, update courier details and reduce stock
@@ -1615,6 +1727,9 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
       const customer = await User.findById(order.userId);
       if (customer && customer.email) {
         sendOrderStatusEmail(customer.email, customer.name, order);
+        if (status === 'delivered') {
+          sendInvoiceEmail(customer.email, customer.name, order);
+        }
       }
 
 
@@ -1777,6 +1892,29 @@ app.patch('/api/orders/:id/refund-details-submitted', authenticateToken, async (
     res.status(500).json({ error: 'Failed to update order.' });
   }
 });
+
+// Admin - Resend Invoice Email
+app.post('/api/admin/orders/:id/resend-invoice', authenticateToken, adminAuth, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate('userId', 'name email');
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const customer = order.userId;
+    if (!customer || !customer.email) {
+      return res.status(400).json({ error: 'Customer email not found' });
+    }
+
+    await sendInvoiceEmail(customer.email, customer.name, order);
+    res.json({ message: 'Invoice email resent successfully' });
+  } catch (error) {
+    console.error('Error resending invoice:', error);
+    res.status(500).json({ error: 'Failed to resend invoice email' });
+  }
+});
+
 // Get orders by date range for admin
 app.get('/api/admin/orders/date-range', authenticateToken, adminAuth, async (req, res) => {
   try {
