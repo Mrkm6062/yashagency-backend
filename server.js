@@ -247,6 +247,8 @@ const userSchema = new mongoose.Schema({
   salesmanAddress: { type: String },
   salesmanPincode: { type: String },
 
+  createdBy: { type: String, enum: ['self', 'salesman', 'admin'], default: 'self' },
+
   // 🔥 Added for secure session management
   sessionVersion: { type: Number, default: 0 },
   activeSessions: { type: [String], default: [] }
@@ -968,7 +970,7 @@ app.post('/api/register',
         return res.status(400).json({ error: 'User already exists' });
       }
 
-      const user = new User({ name, email, password, phone, isEmailVerified: true }); // Mark as verified after OTP
+      const user = new User({ name, email, password, phone, isEmailVerified: true, createdBy: 'self' }); // Mark as verified after OTP
       await user.save();
 
       const token = jwt.sign(
@@ -2477,6 +2479,7 @@ app.post('/api/admin/users', authenticateToken, adminAuth, async (req, res) => {
       phone,
       role: role === 'admin' ? 'admin' : 'user', // Ensure role is either 'admin' or defaults to 'user'
       isEmailVerified: true, // Admins create verified users
+      createdBy: 'admin'
     });
 
     await newUser.save();
@@ -3022,7 +3025,8 @@ app.post('/api/salesman/customers', authenticateToken, salesmanAuth, validate(cr
       phone,
       password,
       role: 'customer',
-      isEmailVerified: true
+      isEmailVerified: true,
+      createdBy: 'salesman'
     });
 
     if (address && pincode) {
@@ -3090,7 +3094,8 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
         phone: customerPhone,
         password: generatedPassword,
         role: 'customer',
-        isEmailVerified: true
+        isEmailVerified: true,
+        createdBy: 'salesman'
       });
       await customer.save();
     }
