@@ -868,6 +868,20 @@ const sendInvoiceEmail = async (userEmail, userName, order) => {
   }
 };
 
+const sendSystemEmail = async (subject, htmlBody) => {
+  if (!process.env.SYS_EMAIL || !process.env.EMAIL_HOST) return;
+  try {
+    await emailTransporter.sendMail({
+      from: `"Yash Agency System" <${process.env.EMAIL_USER}>`,
+      to: process.env.SYS_EMAIL,
+      subject: subject,
+      html: htmlBody
+    });
+  } catch (error) {
+    console.error('Failed to send system email:', error);
+  }
+};
+
 // API Routes
 
 // Get all products
@@ -1738,6 +1752,12 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
         }
       }
 
+      // Send system email for status update
+      sendSystemEmail(
+        `Order Status Update: #${order.orderNumber || order._id.toString().slice(-8)} is ${status}`,
+        `<p>Order <strong>#${order.orderNumber || order._id}</strong> status has been updated to <strong>${status}</strong>.</p>
+         <p>Updated by: ${req.user.name} (${req.user.email})</p>`
+      );
 
       // Create a notification for the user and send a push notification
       if (order.userId) {
@@ -3018,6 +3038,15 @@ app.post('/api/salesman/customers', authenticateToken, salesmanAuth, validate(cr
 
     await customer.save();
 
+    // Send system email for new customer
+    sendSystemEmail(
+      `New Customer Created by Salesman: ${name}`,
+      `<p>Salesman <strong>${req.user.name}</strong> created a new customer.</p>
+       <p>Name: ${name}</p>
+       <p>Phone: ${phone}</p>
+       <p>Email: ${email}</p>`
+    );
+
     res.status(201).json({ message: 'Customer created successfully', customer: { _id: customer._id, name: customer.name, email: customer.email, phone: customer.phone } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create customer' });
@@ -3123,6 +3152,15 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
 
     // Also send the standard new order notification to the admin
     sendNewOrderAdminNotification(order);
+
+    // Send system email for salesman order
+    sendSystemEmail(
+      `New Salesman Order: #${order.orderNumber}`,
+      `<p>Salesman <strong>${req.user.name}</strong> placed a new order.</p>
+       <p>Order: #${order.orderNumber}</p>
+       <p>Customer: ${customer.name} (${customer.phone})</p>
+       <p>Total: ₹${total}</p>`
+    );
 
     res.status(201).json({ message: 'Order placed successfully', orderId: order._id, orderNumber: order.orderNumber });
 
