@@ -2985,7 +2985,7 @@ app.get('/api/salesman/customers', authenticateToken, salesmanAuth, async (req, 
     if (!search) return res.json([]);
 
     const customers = await User.find({
-      role: 'customer',
+      role: { $in: ['customer', 'user'] },
       $or: [
         { name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
@@ -3026,7 +3026,7 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
     const { customerPhone, items, shippingAddress } = req.body;
 
     // 1. Find or Create Customer
-      let customer = await User.findOne({ phone: customerPhone });
+      let customer = await User.findOne({ phone: customerPhone, role: { $in: ['customer', 'user'] } });
     if (!customer) {
       const generatedEmail = `${customerPhone}@guest.Yash Agency.in`; // Dummy email
       const generatedPassword = crypto.randomBytes(8).toString('hex');
