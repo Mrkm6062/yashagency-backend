@@ -548,7 +548,7 @@ const salesmanAuth = (req, res, next) => {
   }
 };
 
-const sendOrderStatusEmail = async (userEmail, userName, order) => {
+const sendOrderStatusEmail = async (userEmail, userName, order, ccEmail = null) => {
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.error('Email service is not configured. Skipping order status email.');
     return;
@@ -743,12 +743,18 @@ const sendOrderStatusEmail = async (userEmail, userName, order) => {
   }
 
   try {
-    await emailTransporter.sendMail({
+    const mailOptions = {
       from: `"Yash Agency" <${process.env.EMAIL_USER}>`,
       to: userEmail,
       subject: subject,
       html: htmlBody,
-    });
+    };
+
+    if (ccEmail) {
+      mailOptions.cc = ccEmail;
+    }
+
+    await emailTransporter.sendMail(mailOptions);
   } catch (error) {
     console.error(`Failed to send order status email to ${userEmail}:`, error);
   }
@@ -3107,6 +3113,16 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
     });
 
     await order.save();
+
+    // Send order confirmation email to customer with CC
+    // Only send if it's a real email, not a generated guest email
+    if (customer.email && !customer.email.includes('@guest.')) {
+      const ccEmail = process.env.CC_EMAIL; // Make sure to set CC_EMAIL in your .env file
+      sendOrderStatusEmail(customer.email, customer.name, order, ccEmail);
+    }
+
+    // Also send the standard new order notification to the admin
+    sendNewOrderAdminNotification(order);
 
     res.status(201).json({ message: 'Order placed successfully', orderId: order._id, orderNumber: order.orderNumber });
 
