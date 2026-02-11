@@ -2999,64 +2999,6 @@ app.get('/api/salesman/customers', authenticateToken, salesmanAuth, async (req, 
   }
 });
 
-const createCustomerBySalesmanSchema = z.object({
-  body: z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-    phone: z.string().min(10),
-    address: z.string().optional(),
-    pincode: z.string().regex(/^\d{6}$/, "Pincode must be 6 digits").optional().or(z.literal(''))
-  })
-});
-
-app.post('/api/salesman/customers', authenticateToken, salesmanAuth, validate(createCustomerBySalesmanSchema), async (req, res) => {
-  try {
-    const { name, email, phone, address, pincode } = req.body;
-
-    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Customer with this email or phone already exists' });
-    }
-
-    const password = crypto.randomBytes(8).toString('hex');
-    const customer = new User({
-      name,
-      email,
-      phone,
-      password,
-      role: 'customer',
-      isEmailVerified: true,
-      createdBy: 'salesman'
-    });
-
-    if (address && pincode) {
-      customer.addresses.push({
-        name,
-        mobileNumber: phone,
-        street: address,
-        city: 'N/A', // Defaulting as it is required in schema but not asked
-        zipCode: pincode,
-        country: 'India'
-      });
-    }
-
-    await customer.save();
-
-    // Send system email for new customer
-    sendSystemEmail(
-      `New Customer Created by Salesman: ${name}`,
-      `<p>Salesman <strong>${req.user.name}</strong> created a new customer.</p>
-       <p>Name: ${name}</p>
-       <p>Phone: ${phone}</p>
-       <p>Email: ${email}</p>`
-    );
-
-    res.status(201).json({ message: 'Customer created successfully', customer: { _id: customer._id, name: customer.name, email: customer.email, phone: customer.phone } });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create customer' });
-  }
-});
-
 // --- Salesman Order Routes ---
 
 const salesmanOrderSchema = z.object({
@@ -3160,10 +3102,10 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
 
     // Send system email for salesman order
     sendSystemEmail(
-      `New Salesman Order: #${order.orderNumber}`,
-      `<p>Salesman <strong>${req.user.name}</strong> placed a new order.</p>
+      `New Order Placed: #${order.orderNumber}`,
+      `<p>Salesman <strong>${req.user.name}</strong> (${req.user.phone}) placed a new order.</p>
        <p>Order: #${order.orderNumber}</p>
-       <p>Customer: ${customer.name} (${customer.phone})</p>
+       <p>Customer: ${req.user.name} (${req.user.phone})</p>
        <p>Total: ₹${total}</p>`
     );
 
