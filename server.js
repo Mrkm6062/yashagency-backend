@@ -2876,7 +2876,7 @@ app.patch('/api/admin/contacts/:id/status', authenticateToken, adminAuth, async 
 // Create admin account (bypasses rate limiting)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const adminEmail = ['yashagency25@gmail.com'];
+    const adminEmail = 'yashagency25@gmail.com';
     const { password } = req.body;
     
     if (!password || password.length < 6) {
@@ -2891,7 +2891,8 @@ app.post('/api/create-admin', async (req, res) => {
     const adminUser = new User({
       name: 'Admin',
       email: adminEmail,
-      password: password
+      password: password,
+      role: 'admin'
     });
     
     await adminUser.save();
@@ -3026,7 +3027,11 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
     const { customerPhone, items, shippingAddress } = req.body;
 
     // 1. Find or Create Customer
-      let customer = await User.findOne({ phone: customerPhone, role: { $in: ['customer', 'user'] } });
+      let customer = await User.findOne({ 
+        phone: customerPhone, 
+        role: { $in: ['customer', 'user'] },
+        email: { $ne: 'yashagency25@gmail.com' } // Explicitly exclude admin email
+      });
     if (!customer) {
       const generatedEmail = `${customerPhone}@guest.Yash Agency.in`; // Dummy email
       const generatedPassword = crypto.randomBytes(8).toString('hex');
@@ -3079,7 +3084,11 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
       userId: customer._id,
       items: orderItems,
       total,
-      shippingAddress,
+      // Ensure shipping address has the correct name from the customer if not provided
+      shippingAddress: shippingAddress ? {
+        ...shippingAddress,
+        name: shippingAddress.name || customer.name
+      } : undefined,
       orderBy: 'salesman',
       status: 'pending',
       paymentMethod: 'cod',
