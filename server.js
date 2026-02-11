@@ -3026,7 +3026,7 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
     const { customerPhone, items, shippingAddress } = req.body;
 
     // 1. Find or Create Customer
-    let customer = await User.findOne({ phone: customerPhone });
+      let customer = await User.findOne({ phone: customerPhone });
     if (!customer) {
       const generatedEmail = `${customerPhone}@guest.Yash Agency.in`; // Dummy email
       const generatedPassword = crypto.randomBytes(8).toString('hex');
@@ -3097,7 +3097,8 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
       sendOrderStatusEmail(customer.email, customer.name, order, ccEmail);
     }
 
-    // Also send the standard new order notification to the admin
+
+      // Also send the standard new order notification to the admin
     sendNewOrderAdminNotification(order);
 
     // Send system email for salesman order
