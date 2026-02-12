@@ -1943,6 +1943,93 @@ app.post('/api/admin/orders/:id/resend-invoice', authenticateToken, adminAuth, a
   }
 });
 
+// Admin - Bulk update payment status
+app.patch('/api/admin/orders/bulk-payment-status', authenticateToken, adminAuth, async (req, res) => {
+  try {
+    const { orderIds, paymentStatus } = req.body;
+    
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ error: 'No orders selected' });
+    }
+
+    const result = await Order.updateMany(
+      { _id: { $in: orderIds } },
+      { $set: { paymentStatus: paymentStatus } }
+    );
+
+    res.json({ message: `Updated ${result.modifiedCount} orders successfully` });
+  } catch (error) {
+    console.error('Bulk payment update error:', error);
+    res.status(500).json({ error: 'Failed to update orders' });
+  }
+});
+
+// Admin - Bulk update order status
+app.patch('/api/admin/orders/bulk-status', authenticateToken, adminAuth, async (req, res) => {
+  try {
+    const { orderIds, status } = req.body;
+
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ error: 'No orders selected' });
+    }
+
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    await Promise.all(orderIds.map(async (orderId) => {
+      try {
+        const order = await Order.findById(orderId);
+        if (!order) {
+          failCount++;
+          return;
+        }
+
+        if (order.status === status) {
+          successCount++;
+          return;
+        }
+
+        order.statusHistory.push({
+          status: status,
+          updatedAt: new Date(),
+          updatedBy: req.user.email,
+          notes: `Bulk status update to ${status}`
+        });
+        order.status = status;
+
+        if (status === 'delivered' && order.paymentMethod === 'cod') {
+          order.paymentStatus = 'received';
+        }
+
+        await order.save();
+
+        const customer = await User.findById(order.userId);
+        if (customer && customer.email) {
+          sendOrderStatusEmail(customer.email, customer.name, order);
+          if (status === 'delivered') {
+            sendInvoiceEmail(customer.email, customer.name, order);
+          }
+        }
+
+        successCount++;
+      } catch (e) {
+        console.error(`Failed to update order ${orderId}`, e);
+        failCount++;
+      }
+    }));
+
+    res.json({ message: `Updated ${successCount} orders. Failed: ${failCount}` });
+  } catch (error) {
+    console.error('Bulk status update error:', error);
+    res.status(500).json({ error: 'Failed to update orders' });
+  }
+});
+
 // Get orders by date range for admin
 app.get('/api/admin/orders/date-range', authenticateToken, adminAuth, async (req, res) => {
   try {
