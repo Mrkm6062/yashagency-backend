@@ -2444,6 +2444,9 @@ app.post('/api/admin/upload', authenticateToken, adminAuth, upload.single('image
     await blob.save(req.file.buffer, {
       contentType: req.file.mimetype,
       resumable: false,
+      metadata: {
+        cacheControl: 'public, max-age=31536000',
+      },
     });
 
     const [url] = await blob.getSignedUrl({
