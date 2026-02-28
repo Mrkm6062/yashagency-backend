@@ -114,7 +114,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/yashdb', 
 // VAPID keys for web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    'mailto:yashagency25@gmail.com',
+    'mailto:admin@yashagency.in',
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );
@@ -598,7 +598,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order, ccEmail = null) 
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#4CAF50; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">Track My Order</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">admin@yashagency.in</a>.</p>
               </td>
             </tr>
             <tr>
@@ -635,7 +635,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order, ccEmail = null) 
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#FFC107; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">Track My Order</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">admin@yashagency.in</a>.</p>
               </td>
             </tr>
             <tr>
@@ -670,7 +670,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order, ccEmail = null) 
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#28A745; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">View My Order</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:support@Yash Agency.com" style="color:#4CAF50; text-decoration:none;">admin@yashagency.in</a>.</p>
               </td>
             </tr>
             <tr>
@@ -731,7 +731,7 @@ const sendOrderStatusEmail = async (userEmail, userName, order, ccEmail = null) 
                 <p style="text-align:center; margin-top:20px;">
                   <a href="${orderLink}" style="background-color:#007BFF; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:5px; font-weight:bold; display: inline-block;">View Order Details</a>
                 </p>
-                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:Yashagency25@gmail.com" style="color:#4CAF50; text-decoration:none;">Yashagency25@gmail.com</a>.</p>
+                <p style="font-size:14px; color:#888; margin-top:30px;">If you have any questions, reply to this email or contact our support team at <a href="mailto:admin@yashagency.in" style="color:#4CAF50; text-decoration:none;">admin@yashagency.in</a>.</p>
               </td>
             </tr>
             <tr>
@@ -852,7 +852,7 @@ const sendInvoiceEmail = async (userEmail, userName, order) => {
         <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #7f8c8d; font-size: 12px;">
           <p style="margin-bottom: 5px;">Thank you for shopping with Yash Agency!</p>
           <p style="margin-bottom: 5px;">SAI SIDDHI CHOWK, DHANKAWADI, PUNE - 411001</p>
-          <p>Contact: 7249635724 / 8329272380 | Email: Yashagency25@gmail.com</p>
+          <p>Contact: 7249635724 / 8329272380 | Email: admin@yashagency.in</p>
         </div>
       </div>
     </body>
@@ -1425,7 +1425,7 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
 
 // --- Admin New Order Notification ---
 const sendNewOrderAdminNotification = async (order) => {
-	const adminEmail = process.env.ADMIN_EMAIL || 'Yashagency25@gmail.com';
+	const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
 	const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
 	const adminOrderLink = `${FRONTEND_URL}/admin/orders`;
 
@@ -1688,7 +1688,7 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
       }
 
       // Allow admin or order owner to update status
-      const adminEmail = process.env.ADMIN_EMAIL || 'yashagency25@gmail.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
       if (req.user.email !== adminEmail && order.userId.toString() !== req.user._id.toString()) {
         return res.status(403).json({ error: 'Access denied' });
       }
@@ -1846,7 +1846,7 @@ app.patch('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
 
 // --- Admin Order Cancellation Notification ---
 const sendOrderCancellationAdminNotification = async (order, user) => {
-  const adminEmail = process.env.ADMIN_EMAIL || 'Yashagency25@gmail.com';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
   const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
   const adminOrderLink = `${FRONTEND_URL}/admin/orders`;
 
@@ -2915,7 +2915,7 @@ app.post('/api/contact', validate(contactSchemaZod),
     }
 
     try {
-      const adminEmail = process.env.ADMIN_EMAIL || 'Yashagency25@gmail.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
 
       await emailTransporter.sendMail({
         from: `"Yash Agency Contact Form" <${process.env.EMAIL_USER}>`,
@@ -2963,7 +2963,7 @@ app.patch('/api/admin/contacts/:id/status', authenticateToken, adminAuth, async 
 // Create admin account (bypasses rate limiting)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const adminEmail = 'yashagency25@gmail.com';
+    const adminEmail = 'admin@yashagency.in';
     const { password } = req.body;
     
     if (!password || password.length < 6) {
@@ -3117,7 +3117,7 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
       let customer = await User.findOne({ 
         phone: customerPhone, 
         role: { $in: ['customer', 'user'] },
-        email: { $ne: 'yashagency25@gmail.com' } // Explicitly exclude admin email
+        email: { $ne: 'admin@yashagency.in' } // Explicitly exclude admin email
       });
     if (!customer) {
       const generatedEmail = `${customerPhone}@guest.Yash Agency.in`; // Dummy email
