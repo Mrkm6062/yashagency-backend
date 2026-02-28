@@ -46,7 +46,7 @@ app.use(helmet({
         "'self'",
         process.env.FRONTEND_URL,
         "https://samriddhishop.info",
-        "https://Yash Agency.in",
+        "https://yashagency.in",
         "https://storage.googleapis.com",
         "https://via.placeholder.com"
       ],
