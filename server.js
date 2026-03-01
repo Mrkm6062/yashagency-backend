@@ -524,7 +524,12 @@ const adminAuth = (req, res, next) => {
     req.user.email &&
     req.user.email.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase();
 
-  if (!isAdmin && !isAdminByEmail) {
+  const isSysAdminByEmail =
+    process.env.SYSADMIN_EMAIL &&
+    req.user.email &&
+    req.user.email.toLowerCase() === process.env.SYSADMIN_EMAIL.toLowerCase();
+
+  if (!isAdmin && !isAdminByEmail && !isSysAdminByEmail) {
     console.warn(`[Admin Auth] Access denied for user: ${req.user.email} (Role: ${req.user.role})`);
     return res.status(403).json({
       error: 'Admin access required'
@@ -871,11 +876,11 @@ const sendInvoiceEmail = async (userEmail, userName, order) => {
 };
 
 const sendSystemEmail = async (subject, htmlBody) => {
-  if (!process.env.SYS_EMAIL || !process.env.EMAIL_HOST) return;
+  if (!process.env.SYSADMIN_EMAIL || !process.env.EMAIL_HOST) return;
   try {
     await emailTransporter.sendMail({
       from: `"Yash Agency System" <${process.env.EMAIL_USER}>`,
-      to: process.env.SYS_EMAIL,
+      to: process.env.SYSADMIN_EMAIL,
       subject: subject,
       html: htmlBody
     });
@@ -1425,7 +1430,8 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
 
 // --- Admin New Order Notification ---
 const sendNewOrderAdminNotification = async (order) => {
-	const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
+	const adminEmail = process.env.SYSADMIN_EMAIL;
+	if (!adminEmail) return;
 	const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
 	const adminOrderLink = `${FRONTEND_URL}/admin/orders`;
 
@@ -1689,7 +1695,10 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
 
       // Allow admin or order owner to update status
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
-      if (req.user.email !== adminEmail && order.userId.toString() !== req.user._id.toString()) {
+      const sysAdminEmail = process.env.SYSADMIN_EMAIL;
+      const isAuthorized = req.user.role === 'admin' || req.user.email === adminEmail || (sysAdminEmail && req.user.email === sysAdminEmail);
+
+      if (!isAuthorized && order.userId.toString() !== req.user._id.toString()) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -1846,7 +1855,8 @@ app.patch('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
 
 // --- Admin Order Cancellation Notification ---
 const sendOrderCancellationAdminNotification = async (order, user) => {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
+  const adminEmail = process.env.SYSADMIN_EMAIL;
+  if (!adminEmail) return;
   const orderIdentifier = order.orderNumber || order._id.toString().slice(-8);
   const adminOrderLink = `${FRONTEND_URL}/admin/orders`;
 
@@ -2918,7 +2928,11 @@ app.post('/api/contact', validate(contactSchemaZod),
     }
 
     try {
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@yashagency.in';
+      const adminEmail = process.env.SYSADMIN_EMAIL;
+      if (!adminEmail) {
+        console.error('SYSADMIN_EMAIL is not configured.');
+        return res.status(500).json({ error: 'Configuration error.' });
+      }
 
       await emailTransporter.sendMail({
         from: `"Yash Agency Contact Form" <${process.env.EMAIL_USER}>`,
