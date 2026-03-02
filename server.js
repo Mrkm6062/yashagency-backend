@@ -75,8 +75,6 @@ const whitelist = [
   'http://localhost:5173', // Add this for Vite's default dev server
   'https://yashagencydev.netlify.app',
   'https://samriddhishop.info',
-  'https://yashagency.in',
-  'https://www.yashagency.in',
   process.env.FRONTEND_URL,
 ];
 
@@ -910,13 +908,6 @@ app.get('/api/products', async (req, res) => {
     }).sort({ createdAt: -1 });
 
     const processedProducts = await Promise.all(products.map(p => processProductImages(p)));
-
-    // Preload first 12 images to improve LCP
-    const imagesToPreload = processedProducts.slice(0, 12).map(p => p.imageUrl).filter(Boolean);
-    if (imagesToPreload.length > 0) {
-      res.setHeader('Link', imagesToPreload.map(url => `<${url}>; rel=preload; as=image`).join(', '));
-    }
-
     res.json(processedProducts);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
@@ -931,11 +922,6 @@ app.get('/api/products/:id', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
     const processedProduct = await processProductImages(product);
-
-    if (processedProduct.imageUrl) {
-      res.setHeader('Link', `<${processedProduct.imageUrl}>; rel=preload; as=image`);
-    }
-
     res.json(processedProduct);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch product' });
