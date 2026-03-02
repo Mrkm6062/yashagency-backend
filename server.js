@@ -75,6 +75,8 @@ const whitelist = [
   'http://localhost:5173', // Add this for Vite's default dev server
   'https://yashagencydev.netlify.app',
   'https://samriddhishop.info',
+  'https://yashagency.in',
+  'https://www.yashagency.in',
   process.env.FRONTEND_URL,
 ];
 
