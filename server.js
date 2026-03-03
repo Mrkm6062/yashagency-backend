@@ -207,7 +207,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true, minlength: 6 },
-  phone: { type: String, trim: true },
+  phone: { type: String, trim: true, unique: true, sparse: true },
 
   wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
   cart: { type: [cartItemSchema], default: [] },
@@ -972,9 +972,9 @@ app.post('/api/register',
       // Delete the OTP so it can't be used again
       await OTP.deleteOne({ email });
       
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
       if (existingUser) {
-        return res.status(400).json({ error: 'User already exists' });
+        return res.status(400).json({ error: 'User with this email or phone already exists' });
       }
 
       const user = new User({ name, email, password, phone, isEmailVerified: true, createdBy: 'self' }); // Mark as verified after OTP
@@ -1122,7 +1122,7 @@ app.post('/api/verify-email-change', authenticateToken, validate(verifyEmailChan
 // Zod schema for user login
 const loginSchema = z.object({
   body: z.object({
-    email: z.string().email({ message: 'Invalid email address' }),
+    email: z.string().min(1, { message: 'Email or Phone number is required' }),
     password: z.string().min(1, { message: 'Password is required' })
   })
 });
@@ -1140,8 +1140,14 @@ app.post('/api/login', validate(loginSchema), async (req, res) => {
       });
     }
 
-    // Find user by email
-    const user = await User.findOne({ email });
+    // Find user by email or phone
+    let user;
+    if (email.includes('@')) {
+      user = await User.findOne({ email: email.toLowerCase() });
+    } else {
+      user = await User.findOne({ phone: email });
+    }
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -2207,6 +2213,13 @@ app.put('/api/profile', authenticateToken, validate(updateProfileSchema),
       const existingUser = await User.findOne({ email, _id: { $ne: req.user._id } });
       if (existingUser) {
         return res.status(400).json({ error: 'Email already in use' });
+      }
+
+      if (phone) {
+        const existingPhoneUser = await User.findOne({ phone, _id: { $ne: req.user._id } });
+        if (existingPhoneUser) {
+          return res.status(400).json({ error: 'Phone number already in use' });
+        }
       }
 
       const user = await User.findByIdAndUpdate(
