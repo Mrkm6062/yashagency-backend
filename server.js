@@ -205,7 +205,7 @@ const cartItemSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  email: { type: String, required: true, unique: true, lowercase: true },
+  email: { type: String, unique: true, lowercase: true, sparse: true },
   password: { type: String, required: true, minlength: 6 },
   phone: { type: String, trim: true, unique: true, sparse: true },
 
@@ -2583,13 +2583,20 @@ app.post('/api/admin/users', authenticateToken, adminAuth, async (req, res) => {
   try {
     const { name, email, password, phone, role } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required.' });
+    if (!name || !phone || !password) {
+      return res.status(400).json({ error: 'Name, phone, and password are required.' });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ error: 'A user with this email already exists.' });
+    if (email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(409).json({ error: 'A user with this email already exists.' });
+      }
+    }
+
+    const existingPhone = await User.findOne({ phone });
+    if (existingPhone) {
+      return res.status(409).json({ error: 'A user with this phone already exists.' });
     }
 
     const newUser = new User({
