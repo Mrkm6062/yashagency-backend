@@ -1145,7 +1145,12 @@ app.post('/api/login', validate(loginSchema), async (req, res) => {
     if (email.includes('@')) {
       user = await User.findOne({ email: email.toLowerCase() });
     } else {
-      user = await User.findOne({ phone: email });
+      user = await User.findOne({
+        $or: [
+          { phone: email },
+          { phone: `+91${email}` }
+        ]
+      });
     }
 
     if (!user) {
