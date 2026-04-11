@@ -1412,14 +1412,14 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
       
       // Reduce stock when order placed
       for (const item of order.items) {
-        if (item.selectedVariant) {
+        if (item.selectedVariant && (item.selectedVariant.size || item.selectedVariant.color)) {
+          const variantQuery = { _id: item.productId };
+          if (item.selectedVariant.size) variantQuery['variants.size'] = item.selectedVariant.size;
+          if (item.selectedVariant.color) variantQuery['variants.color'] = item.selectedVariant.color;
+
           // Reduce variant stock
           await Product.findOneAndUpdate(
-            { 
-              _id: item.productId,
-              'variants.size': item.selectedVariant.size,
-              'variants.color': item.selectedVariant.color
-            },
+            variantQuery,
             { $inc: { 'variants.$.stock': -item.quantity } }
           );
         } else {
@@ -3139,7 +3139,8 @@ const salesmanOrderSchema = z.object({
     items: z.array(z.object({
       productId: z.string(),
       quantity: z.number().min(1),
-      finalPrice: z.number().min(0)
+      finalPrice: z.number().min(0),
+      selectedVariant: z.any().optional()
     })).min(1),
     shippingAddress: z.object({
       name: z.string().optional(),
@@ -3196,7 +3197,8 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
         productId: product._id,
         name: product.name,
         price: item.finalPrice, // Store the salesman's custom price
-        quantity: item.quantity
+        quantity: item.quantity,
+        selectedVariant: item.selectedVariant
       });
     }
 
@@ -3232,14 +3234,14 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
 
     // Reduce stock when order placed
     for (const item of order.items) {
-      if (item.selectedVariant) {
+        if (item.selectedVariant && (item.selectedVariant.size || item.selectedVariant.color)) {
+          const variantQuery = { _id: item.productId };
+          if (item.selectedVariant.size) variantQuery['variants.size'] = item.selectedVariant.size;
+          if (item.selectedVariant.color) variantQuery['variants.color'] = item.selectedVariant.color;
+
         // Reduce variant stock
         await Product.findOneAndUpdate(
-          { 
-            _id: item.productId,
-            'variants.size': item.selectedVariant.size,
-            'variants.color': item.selectedVariant.color
-          },
+            variantQuery,
           { $inc: { 'variants.$.stock': -item.quantity } }
         );
       } else {
