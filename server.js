@@ -1410,6 +1410,26 @@ app.post('/api/checkout', authenticateToken, validate(checkoutSchema),
 
       await order.save();
       
+      // Reduce stock when order placed
+      for (const item of order.items) {
+        if (item.selectedVariant) {
+          // Reduce variant stock
+          await Product.findOneAndUpdate(
+            { 
+              _id: item.productId,
+              'variants.size': item.selectedVariant.size,
+              'variants.color': item.selectedVariant.color
+            },
+            { $inc: { 'variants.$.stock': -item.quantity } }
+          );
+        } else {
+          // Reduce main product stock
+          await Product.findByIdAndUpdate(item.productId, {
+            $inc: { stock: -item.quantity }
+          });
+        }
+      }
+
       // Send order confirmation email
       if (req.user.email) {
         sendOrderStatusEmail(req.user.email, req.user.name, order);
@@ -1743,26 +1763,6 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
           estimatedDelivery: estimatedDelivery ? new Date(estimatedDelivery) : order.courierDetails?.estimatedDelivery,
           shippedAt: new Date()
         };
-        
-        // Reduce stock when order placed
-        for (const item of order.items) {
-          if (item.selectedVariant) {
-            // Reduce variant stock
-            await Product.findOneAndUpdate(
-              { 
-                _id: item.productId,
-                'variants.size': item.selectedVariant.size,
-                'variants.color': item.selectedVariant.color
-              },
-              { $inc: { 'variants.$.stock': -item.quantity } }
-            );
-          } else {
-            // Reduce main product stock
-            await Product.findByIdAndUpdate(item.productId, {
-              $inc: { stock: -item.quantity }
-            });
-          }
-        }
       }
 
       await order.save();
@@ -3229,6 +3229,26 @@ app.post('/api/salesman/orders', authenticateToken, salesmanAuth, validate(sales
     });
 
     await order.save();
+
+    // Reduce stock when order placed
+    for (const item of order.items) {
+      if (item.selectedVariant) {
+        // Reduce variant stock
+        await Product.findOneAndUpdate(
+          { 
+            _id: item.productId,
+            'variants.size': item.selectedVariant.size,
+            'variants.color': item.selectedVariant.color
+          },
+          { $inc: { 'variants.$.stock': -item.quantity } }
+        );
+      } else {
+        // Reduce main product stock
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: -item.quantity }
+        });
+      }
+    }
 
     // Send order confirmation email to customer with CC
     // Only send if it's a real email, not a generated guest email
