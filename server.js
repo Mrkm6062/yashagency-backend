@@ -1737,6 +1737,31 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
 
       // Add to status history
       if (order.status !== status) { // Only add to history if status has changed
+        const oldStatus = order.status;
+        
+        // Handle stock restoration/deduction
+        const isRestoring = ['cancelled', 'refunded'].includes(status) && !['cancelled', 'refunded'].includes(oldStatus);
+        const isDeducting = !['cancelled', 'refunded'].includes(status) && ['cancelled', 'refunded'].includes(oldStatus);
+
+        if (isRestoring || isDeducting) {
+          const multiplier = isRestoring ? 1 : -1;
+          for (const item of order.items) {
+            if (item.selectedVariant && (item.selectedVariant.size || item.selectedVariant.color)) {
+              const variantQuery = { _id: item.productId };
+              if (item.selectedVariant.size) variantQuery['variants.size'] = item.selectedVariant.size;
+              if (item.selectedVariant.color) variantQuery['variants.color'] = item.selectedVariant.color;
+              await Product.findOneAndUpdate(
+                variantQuery,
+                { $inc: { 'variants.$.stock': item.quantity * multiplier } }
+              );
+            } else {
+              await Product.findByIdAndUpdate(item.productId, {
+                $inc: { stock: item.quantity * multiplier }
+              });
+            }
+          }
+        }
+
         order.statusHistory.push({
           status: status, // Use the NEW status
           updatedAt: new Date(),
@@ -1843,6 +1868,23 @@ app.patch('/api/orders/:id/cancel', authenticateToken, async (req, res) => {
 
     const previousStatus = order.status;
     order.status = 'cancelled';
+
+    // Restore stock when cancelled by user
+    for (const item of order.items) {
+      if (item.selectedVariant && (item.selectedVariant.size || item.selectedVariant.color)) {
+        const variantQuery = { _id: item.productId };
+        if (item.selectedVariant.size) variantQuery['variants.size'] = item.selectedVariant.size;
+        if (item.selectedVariant.color) variantQuery['variants.color'] = item.selectedVariant.color;
+        await Product.findOneAndUpdate(
+          variantQuery,
+          { $inc: { 'variants.$.stock': item.quantity } }
+        );
+      } else {
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: item.quantity }
+        });
+      }
+    }
 
     // Add a record to the status history
     order.statusHistory.push({
@@ -2015,6 +2057,31 @@ app.patch('/api/admin/orders/bulk-status', authenticateToken, adminAuth, async (
         if (order.status === status) {
           successCount++;
           return;
+        }
+
+        const oldStatus = order.status;
+        
+        // Handle stock restoration/deduction
+        const isRestoring = ['cancelled', 'refunded'].includes(status) && !['cancelled', 'refunded'].includes(oldStatus);
+        const isDeducting = !['cancelled', 'refunded'].includes(status) && ['cancelled', 'refunded'].includes(oldStatus);
+
+        if (isRestoring || isDeducting) {
+          const multiplier = isRestoring ? 1 : -1;
+          for (const item of order.items) {
+            if (item.selectedVariant && (item.selectedVariant.size || item.selectedVariant.color)) {
+              const variantQuery = { _id: item.productId };
+              if (item.selectedVariant.size) variantQuery['variants.size'] = item.selectedVariant.size;
+              if (item.selectedVariant.color) variantQuery['variants.color'] = item.selectedVariant.color;
+              await Product.findOneAndUpdate(
+                variantQuery,
+                { $inc: { 'variants.$.stock': item.quantity * multiplier } }
+              );
+            } else {
+              await Product.findByIdAndUpdate(item.productId, {
+                $inc: { stock: item.quantity * multiplier }
+              });
+            }
+          }
         }
 
         order.statusHistory.push({
