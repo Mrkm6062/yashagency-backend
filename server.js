@@ -1735,8 +1735,8 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
         }
       }
 
-      // If status is shipped, update courier details and reduce stock
-      if (status === 'shipped' && (courierName || trackingNumber)) {
+      // If status is placed, update courier details and reduce stock
+      if (status === 'pending' && (courierName || trackingNumber)) {
         order.courierDetails = {
           courierName: courierName || order.courierDetails?.courierName,
           trackingNumber: trackingNumber || order.courierDetails?.trackingNumber,
@@ -1744,7 +1744,7 @@ app.patch('/api/orders/:id/status', authenticateToken, validate(updateOrderStatu
           shippedAt: new Date()
         };
         
-        // Reduce stock when shipped
+        // Reduce stock when order placed
         for (const item of order.items) {
           if (item.selectedVariant) {
             // Reduce variant stock
